@@ -1,0 +1,19 @@
+{% load static %}<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>Testlar</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="{% static 'quiz/app.css' %}?v={{ v }}">
+</head>
+<body>
+  <main id="app" aria-live="polite">
+    <div class="loading"><span class="spinner"></span></div>
+  </main>
+  <div id="sheet-root"></div>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="{% static 'quiz/app.js' %}?v={{ v }}"></script>
+</body>
+</html>

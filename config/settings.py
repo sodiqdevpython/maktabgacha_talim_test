@@ -23,6 +23,10 @@ DEV_USER_ID = int(os.environ.get("DEV_USER_ID") or 0)                # faqat DEB
 
 CSRF_TRUSTED_ORIGINS = [WEBAPP_URL] if WEBAPP_URL.startswith("https://") else []
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+if not DEBUG and WEBAPP_URL.startswith("https://"):
+    # Serverda sayt faqat HTTPS orqali ochiladi — cookie'lar ham faqat HTTPS da yuboriladi
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 INSTALLED_APPS = [
     "django.contrib.admin",

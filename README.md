@@ -54,3 +54,35 @@ python manage.py import_questions --replace      # mavzu savollarini o‘chirib,
 Excel fayl nomi mavzu kodi bilan boshlanishi kerak (`1.1 ...xlsx`). Ustunlar:
 `Savol | Option A (to‘g‘ri) | Option B | Option C | Option D`.
 Mavzu nomlari `quiz/topic_titles.py` da; keyin admin paneldan ham o‘zgartirsa bo‘ladi.
+
+## Serverda (VPS)
+
+Loyiha `/home/maktabgacha_talim_test` papkasida, alohida `quizbot` foydalanuvchisi nomidan ishlaydi.
+Serverdagi boshqa loyihalarga tegmaslik uchun sayt o‘z portida ochiladi: `https://189-74-98-102.sslip.io:8443`.
+
+| Nima | Qayerda |
+|------|---------|
+| Sayt + API (gunicorn, HTTPS :8443) | `systemctl status quizbot-web` |
+| Telegram bot | `systemctl status quizbot-bot` |
+| Sertifikatni yangilash (har hafta) | `systemctl list-timers quizbot-cert-renew.timer` |
+| Sozlamalar | `/home/maktabgacha_talim_test/.env` |
+| Baza | `/home/maktabgacha_talim_test/db.sqlite3` |
+| Loglar | `journalctl -u quizbot-web -f`, `journalctl -u quizbot-bot -f` |
+
+Yangi versiyani serverga chiqarish:
+
+```bash
+cd /home/maktabgacha_talim_test
+runuser -u quizbot -- git pull
+runuser -u quizbot -- venv/bin/pip install -r requirements.txt
+runuser -u quizbot -- venv/bin/python manage.py migrate
+runuser -u quizbot -- venv/bin/python manage.py import_questions
+runuser -u quizbot -- venv/bin/python manage.py collectstatic --noinput
+systemctl restart quizbot-web quizbot-bot
+```
+
+Admin uchun login yaratish (serverda bir marta):
+
+```bash
+cd /home/maktabgacha_talim_test && runuser -u quizbot -- venv/bin/python manage.py createsuperuser
+```

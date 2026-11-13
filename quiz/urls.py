@@ -7,6 +7,7 @@ urlpatterns = [
     path("api/home/", views.home),
     path("api/sessions/", views.start_session),
     path("api/sessions/<int:pk>/", views.session_detail),
+    path("api/sessions/<int:pk>/q/<int:index>/", views.question),
     path("api/sessions/<int:pk>/answer/", views.answer),
     path("api/sessions/<int:pk>/result/", views.result),
     path("api/leaderboard/", views.leaderboard),

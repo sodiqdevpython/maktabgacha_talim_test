@@ -36,6 +36,8 @@ python manage.py runbot                   # Telegram bot
 - **Aralash test** — nechta savol kerakligi kiritiladi, savollar barcha mavzulardan teng taqsimlab olinadi.
 - Variantlar har safar aralashtiriladi. To‘g‘ri javob brauzerga yuborilmaydi — tekshiruv serverda.
 - Tugallanmagan testni bosh sahifadagi «Davom ettirish» orqali davom ettirish mumkin.
+- **Oldingi / Keyingi** tugmalari — savollar orasida erkin yurish mumkin: savolni o‘tkazib yuborish, keyin qaytib javob berish, javob berilganini qayta ko‘rish.
+- **Izoh** — savolga javob berilgach, to‘g‘ri javob nega to‘g‘ri ekani haqida qisqa izoh chiqadi. Izohlar oldindan (bir marta) AI yordamida ma’ruza matni asosida tuziladi va bazadagi alohida jadvalda saqlanadi; test paytida AI chaqirilmaydi.
 - **Reyting** (pastki menyu) — bugun / shu hafta / shu oyda eng ko‘p savol ishlagan foydalanuvchilar.
 - **Natijalarim** (pastki menyu) — foydalanuvchining o‘z ko‘rsatkichlari va oxirgi testlari.
 
@@ -52,7 +54,7 @@ python manage.py import_questions --replace      # mavzu savollarini o‘chirib,
 ```
 
 Excel fayl nomi mavzu kodi bilan boshlanishi kerak (`1.1 ...xlsx`). Ustunlar:
-`Savol | Option A (to‘g‘ri) | Option B | Option C | Option D`.
+`Savol | Option A (to‘g‘ri) | Option B | Option C | Option D | Izoh (ixtiyoriy)`.
 Mavzu nomlari `quiz/topic_titles.py` da; keyin admin paneldan ham o‘zgartirsa bo‘ladi.
 
 ## Serverda (VPS)

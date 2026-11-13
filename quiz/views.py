@@ -11,7 +11,7 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Question, QuizSession, SessionQuestion, TelegramUser, Topic
+from .models import Question, QuestionExplanation, QuizSession, SessionQuestion, TelegramUser, Topic
 from .serializers import AnswerSerializer, StartSessionSerializer
 
 STATIC_DIR = Path(__file__).resolve().parent / "static" / "quiz"
@@ -26,26 +26,52 @@ def index(request):
 # ------------------------------------------------------------------ yordamchilar
 
 
+def first_unanswered(s):
+    return s.items.filter(answered=False).order_by("index").values_list("index", flat=True).first()
+
+
 def session_payload(s):
+    """position — javob berilgan savollar soni; current — javob berilmagan birinchi savol."""
     return {"id": s.id, "mode": s.mode, "total": s.total, "position": s.position,
             "title": s.title, "topic": None if s.is_mixed else s.topic_id, "mixed": s.is_mixed,
-            "done": s.is_complete}
+            "done": s.is_complete, "closed": s.finished_at is not None,
+            "current": None if s.is_complete else first_unanswered(s)}
 
 
-def question_payload(s):
-    """Joriy savol. To'g'ri javob qaysi ekani brauzerga HECH QACHON yuborilmaydi."""
-    if s.is_complete:
+def explanation_of(q):
+    try:
+        return q.explanation.text
+    except QuestionExplanation.DoesNotExist:
+        return ""
+
+
+def question_payload(s, index=None):
+    """Bitta savol holati (index berilmasa — javob berilmagan birinchi savol).
+
+    To'g'ri javob o'rni va izoh brauzerga FAQAT savolga javob berib bo'lingandan keyin yuboriladi.
+    """
+    if index is None:
+        index = first_unanswered(s)
+        if index is None:
+            return None
+    item = (s.items.select_related("question__topic", "question__explanation")
+            .filter(index=index).first())
+    if item is None:
         return None
-    item = s.items.select_related("question__topic").get(index=s.position)
     q = item.question
     opts = q.options
-    return {
+    data = {
         "index": item.index,
         "text": q.text,
         "options": [opts[int(c)] for c in item.order],
         "tried": [int(c) for c in item.tried],
         "topic": f"{q.topic.code}. {q.topic.title}" if s.is_mixed else "",
+        "answered": item.answered,
     }
+    if item.answered:
+        data["correct_position"] = item.order.index("0")
+        data["explanation"] = explanation_of(q)
+    return data
 
 
 def pick_mixed(n):
@@ -146,6 +172,16 @@ def session_detail(request, pk):
     return Response({"session": session_payload(s), "question": question_payload(s)})
 
 
+@api_view(["GET"])
+def question(request, pk, index):
+    """Istalgan savolni ko'rish — oldingi/keyingi savolga o'tish uchun."""
+    s = get_object_or_404(QuizSession.objects.select_related("topic"), pk=pk, user=request.user)
+    data = question_payload(s, index)
+    if data is None:
+        return Response({"detail": "Savol topilmadi."}, status=404)
+    return Response({"session": session_payload(s), "question": data})
+
+
 @api_view(["POST"])
 def answer(request, pk):
     ser = AnswerSerializer(data=request.data)
@@ -155,29 +191,30 @@ def answer(request, pk):
     with transaction.atomic():
         s = get_object_or_404(QuizSession.objects.select_for_update().select_related("topic"),
                               pk=pk, user=request.user)
-        if s.is_complete or s.finished_at or index != s.position:
-            # Eskirgan so'rov (masalan ikki marta bosilgan) — joriy holatni qaytaramiz
-            return Response({"stale": True, "session": session_payload(s), "question": question_payload(s)})
+        item = s.items.select_related("question").filter(index=index).first()
+        if item is None:
+            return Response({"detail": "Savol topilmadi."}, status=404)
+        if item.answered or s.finished_at:
+            # Bu savolga allaqachon javob berilgan yoki test yopilgan — joriy holatni qaytaramiz
+            return Response({"stale": True, "session": session_payload(s),
+                             "question": question_payload(s, index)})
 
-        item = s.items.select_related("question").get(index=index)
         is_correct = item.order[position] == "0"
-        correct_position = None
-        advance = False
+        resolved = False
 
-        if s.mode == QuizSession.STRICT:
+        if s.mode == QuizSession.STRICT:  # mashq: to'g'ri topilmaguncha savol ochiq qoladi
             if is_correct:
                 item.first_try_correct = item.tried == ""
-                advance = True
+                resolved = True
             elif str(position) not in item.tried:
                 item.tried += str(position)
         else:  # imtihon: bitta urinish
             item.first_try_correct = is_correct
-            advance = True
+            resolved = True
             if not is_correct:
                 item.tried = str(position)
-                correct_position = item.order.index("0")
 
-        if advance:
+        if resolved:
             item.answered = True
             item.answered_at = timezone.now()
             s.position += 1
@@ -190,24 +227,26 @@ def answer(request, pk):
 
     return Response({
         "correct": is_correct,
-        "correct_position": correct_position,
-        "advanced": advance,
+        "resolved": resolved,
         "session": session_payload(s),
-        "question": question_payload(s) if advance else None,
+        # yangilangan holat: javob berilgan bo'lsa to'g'ri javob o'rni va izoh bilan
+        "question": question_payload(s, index),
     })
 
 
 @api_view(["GET"])
 def result(request, pk):
     s = get_object_or_404(QuizSession.objects.select_related("topic"), pk=pk, user=request.user)
-    missed = (s.items.filter(answered=True, first_try_correct=False).select_related("question"))
+    missed = (s.items.filter(answered=True, first_try_correct=False)
+              .select_related("question__explanation"))
     return Response({
         "session": session_payload(s),
         "answered": s.position,
         "correct": s.correct_count,
         "wrong": s.position - s.correct_count,
         "percent": s.percent,
-        "mistakes": [{"text": i.question.text, "correct": i.question.correct} for i in missed],
+        "mistakes": [{"text": i.question.text, "correct": i.question.correct,
+                      "explanation": explanation_of(i.question)} for i in missed],
     })
 
 

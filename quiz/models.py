@@ -82,6 +82,21 @@ class Question(models.Model):
         return [self.correct, self.wrong1, self.wrong2, self.wrong3]
 
 
+class QuestionExplanation(models.Model):
+    """To'g'ri javob nega to'g'ri ekani haqida qisqa izoh (oldindan AI yordamida, ma'ruza asosida tuziladi)."""
+    question = models.OneToOneField(Question, verbose_name="Savol", related_name="explanation",
+                                    on_delete=models.CASCADE)
+    text = models.TextField("Izoh")
+    updated_at = models.DateTimeField("Yangilangan", auto_now=True)
+
+    class Meta:
+        verbose_name = "Izoh"
+        verbose_name_plural = "Izohlar"
+
+    def __str__(self):
+        return self.text[:80]
+
+
 class QuizSession(models.Model):
     STRICT = "strict"   # to'g'ri topmaguncha keyingisiga o'tmaydi
     EXAM = "exam"       # har savolga bitta urinish
@@ -94,7 +109,7 @@ class QuizSession(models.Model):
     is_mixed = models.BooleanField("Aralash", default=False)
     mode = models.CharField("Rejim", max_length=8, choices=MODES, default=STRICT)
     total = models.PositiveIntegerField("Savollar soni", default=0)
-    position = models.PositiveIntegerField("Javob berilgan", default=0)
+    position = models.PositiveIntegerField("Javob berilgan", default=0)  # javob berilgan savollar soni
     correct_count = models.PositiveIntegerField("Birinchi urinishda to‘g‘ri", default=0)
     started_at = models.DateTimeField("Boshlangan", auto_now_add=True)
     finished_at = models.DateTimeField("Tugagan", null=True, blank=True)

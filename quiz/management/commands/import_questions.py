@@ -4,7 +4,8 @@
     python manage.py import_questions D:/savollar --replace
 
 Har bir .xlsx — bitta mavzu. Fayl nomi "1.1 ..." kabi kod bilan boshlanadi.
-Ustunlar: Savol | Option A (to'g'ri) | Option B | Option C | Option D
+Ustunlar: Savol | Option A (to'g'ri) | Option B | Option C | Option D | Izoh (ixtiyoriy)
+Izoh ustuni bo'lsa, u mavjud savollar uchun ham yangilanadi (izoh.py tuzadi).
 """
 import re
 from pathlib import Path
@@ -14,7 +15,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from openpyxl import load_workbook
 
-from quiz.models import Module, Question, Topic
+from quiz.models import Module, Question, QuestionExplanation, Topic
 from quiz.topic_titles import MODULES, TOPICS
 
 
@@ -34,7 +35,7 @@ class Command(BaseCommand):
         if not files:
             raise CommandError(f"{folder} ichida .xlsx fayl yo'q")
 
-        total_new = 0
+        total_new = total_expl = 0
         for f in sorted(files):
             m = re.match(r"\s*(\d+)[.,](\d+)", f.name)
             if not m:
@@ -46,8 +47,8 @@ class Command(BaseCommand):
             rows = []
             ws = load_workbook(f, read_only=True).active
             for r in ws.iter_rows(min_row=2, values_only=True):
-                cells = [" ".join(str(c).split()) if c is not None else "" for c in (list(r) + [""] * 5)[:5]]
-                if all(cells):
+                cells = [" ".join(str(c).split()) if c is not None else "" for c in (list(r) + [None] * 6)[:6]]
+                if all(cells[:5]):
                     rows.append(cells)
 
             with transaction.atomic():
@@ -62,9 +63,30 @@ class Command(BaseCommand):
                 new = [Question(topic=topic, text=c[0], correct=c[1], wrong1=c[2], wrong2=c[3], wrong3=c[4])
                        for c in rows if c[0] not in have]
                 Question.objects.bulk_create(new)
+
+                # izohlar: yangi va mavjud savollar uchun yaratiladi yoki yangilanadi
+                ids = dict(topic.questions.values_list("text", "id"))
+                old = {e.question_id: e for e in QuestionExplanation.objects.filter(question__topic=topic)}
+                to_create, to_update = [], []
+                for c in rows:
+                    qid, text = ids.get(c[0]), c[5]
+                    if not qid or not text:
+                        continue
+                    e = old.get(qid)
+                    if e is None:
+                        to_create.append(QuestionExplanation(question_id=qid, text=text))
+                    elif e.text != text:
+                        e.text = text
+                        to_update.append(e)
+                QuestionExplanation.objects.bulk_create(to_create)
+                for e in to_update:
+                    e.save()
+                expl = len(to_create) + len(to_update)
             total_new += len(new)
-            self.stdout.write(f"{code:>5}  +{len(new):<4} (jami {topic.questions.count()})  {topic.title}")
+            total_expl += expl
+            self.stdout.write(f"{code:>5}  +{len(new):<4} savol, izoh +{expl:<4} (jami {topic.questions.count()})  {topic.title}")
 
         self.stdout.write(self.style.SUCCESS(
-            f"Tayyor: {total_new} ta yangi savol. Bazada jami {Question.objects.count()} ta savol, "
+            f"Tayyor: {total_new} ta yangi savol, {total_expl} ta izoh yangilandi. Bazada jami "
+            f"{Question.objects.count()} ta savol, {QuestionExplanation.objects.count()} ta izoh, "
             f"{Topic.objects.count()} ta mavzu."))

@@ -7,6 +7,7 @@
   const sheetRoot = document.getElementById("sheet-root");
   const toastEl = document.getElementById("toast");
   const tabbar = document.getElementById("tabbar");
+  const qnav = document.getElementById("qnav");
   const TABS = ["home", "rank", "me"];
   const PERIODS = [["day", "Bugun"], ["week", "Hafta"], ["month", "Oy"]];
   const MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
@@ -94,6 +95,8 @@
     state.screen = name;
     const tabs = TABS.includes(name);
     tabbar.hidden = !tabs;
+    qnav.hidden = name !== "quiz";
+    document.body.classList.toggle("has-qnav", name === "quiz");
     document.body.classList.toggle("has-tabs", tabs);
     tabbar.querySelectorAll("button").forEach((b) => {
       if (b.dataset.tab === name) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
@@ -321,12 +324,10 @@
     try {
       const r = await api("sessions/", params);
       state.last = params;
-      state.session = r.session;
-      state.question = r.question;
       store.set("mode", params.mode);
       if (!params.topic) store.set("mixedCount", String(params.count));
       closeSheet();
-      renderQuiz();
+      openQuiz(r);
     } catch (e) {
       if (button) button.disabled = false;
       fail(e);
@@ -339,15 +340,27 @@
     loading();
     try {
       const r = await api(`sessions/${id}/`);
-      state.session = r.session;
-      state.question = r.question;
       state.last = null;
-      if (r.session.done || !r.question) return showResult();
-      renderQuiz();
+      if (r.session.done || !r.question) { state.session = r.session; return showResult(); }
+      openQuiz(r);
     } catch (e) { fail(e); showHome(); }
   }
 
   // ------------------------------------------------------------ test
+  const qcache = new Map(); // index -> savol holati (oldingi/keyingi savolga tez o'tish uchun)
+
+  function setQuestion(q) {
+    state.question = q;
+    qcache.set(q.index, q);
+  }
+
+  function openQuiz(r) {
+    qcache.clear();
+    state.session = r.session;
+    setQuestion(r.question);
+    renderQuiz();
+  }
+
   function renderQuiz() {
     setScreen("quiz");
     const s = state.session;
@@ -355,30 +368,57 @@
       <div class="screen">
         <div class="qbar">
           <button class="close" data-act="exit" aria-label="Chiqish">${ICON.close}</button>
-          <div class="count"><span id="pos">${s.position + 1}</span> <small>/ ${s.total}</small></div>
+          <div class="count"><span id="pos"></span> <small>/ ${s.total}</small></div>
           <span class="spacer"></span>
         </div>
-        <div class="progress"><i id="bar" style="width:${(100 * s.position) / s.total}%"></i></div>
+        <div class="progress"><i id="bar"></i></div>
         <div class="qwrap" id="qwrap"></div>
       </div>`;
-    renderQuestion(false);
+    renderQuestion("");
     window.scrollTo(0, 0);
   }
 
-  function renderQuestion(animate) {
+  function explHtml(q) {
+    return q.explanation ? `<div class="expl"><b>Izoh</b><p>${esc(q.explanation)}</p></div>` : "";
+  }
+
+  // dir: "" (animatsiyasiz) | "fwd" | "back"
+  function renderQuestion(dir) {
     const q = state.question;
+    const exam = state.session.mode === "exam";
     const wrap = document.getElementById("qwrap");
-    wrap.className = "qwrap" + (animate ? " enter" : "");
+    wrap.className = "qwrap" + (dir ? " enter-" + dir : "");
     wrap.innerHTML = `
       ${q.topic ? `<p class="qtopic">${esc(q.topic)}</p>` : ""}
       <div class="qtext">${esc(q.text)}</div>
       <div class="opts">${q.options.map((o, i) => {
-        const tried = q.tried.includes(i);
-        return `<button class="opt${tried ? " wrong" : ""}" data-pos="${i}"${tried ? " disabled" : ""}>
+        let cls = "", mark = "";
+        if (q.tried.includes(i)) { cls = " wrong"; mark = ICON.cross; }
+        else if (q.answered && i === q.correct_position) {
+          cls = (exam && q.tried.length ? " reveal" : " correct") + " still";
+          mark = ICON.check;
+        } else if (q.answered) cls = " dim";
+        return `<button class="opt${cls}" data-pos="${i}"${q.answered || q.tried.includes(i) ? " disabled" : ""}>
           <span class="ltr">${LETTERS[i]}</span><span class="txt">${esc(o)}</span>
-          <span class="mark">${tried ? ICON.cross : ""}</span></button>`;
+          <span class="mark">${mark}</span></button>`;
       }).join("")}</div>
-      <p class="hint" id="hint"></p>`;
+      <p class="hint" id="hint"></p>
+      <div id="expl">${q.answered ? explHtml(q) : ""}</div>`;
+    updateBar();
+  }
+
+  function updateBar() {
+    const s = state.session, q = state.question;
+    const pos = document.getElementById("pos");
+    const bar = document.getElementById("bar");
+    if (pos) pos.textContent = q.index + 1;
+    if (bar) bar.style.width = (100 * s.position) / s.total + "%";
+    const prev = qnav.querySelector('[data-nav="prev"]');
+    const next = qnav.querySelector('[data-nav="next"]');
+    prev.disabled = q.index === 0;
+    document.getElementById("nextLabel").textContent = s.done ? "Natija" : "Keyingi";
+    // savolga javob berilgan bo'lsa "Keyingi" asosiy (to'q) tugma bo'ladi
+    next.classList.toggle("ghost", !q.answered && !s.done);
   }
 
   function setMark(btn, kind) {
@@ -392,12 +432,51 @@
     btn.classList.add("shake");
   }
 
+  function prefetch(index) {
+    const s = state.session;
+    if (index < 0 || index >= s.total || qcache.has(index)) return;
+    api(`sessions/${s.id}/q/${index}/`).then((r) => {
+      if (state.session && state.session.id === s.id && !qcache.has(index)) qcache.set(index, r.question);
+    }).catch(() => { /* keyin kerak bo'lganda qayta so'raladi */ });
+  }
+
+  async function goTo(index, dir) {
+    const s = state.session;
+    if (state.busy || index < 0 || index >= s.total || index === state.question.index) return;
+    state.busy = true;
+    let q = qcache.get(index);
+    if (!q) {
+      try {
+        const r = await api(`sessions/${s.id}/q/${index}/`);
+        q = r.question;
+        state.session = r.session;
+      } catch (e) { state.busy = false; return fail(e); }
+    }
+    const wrap = document.getElementById("qwrap");
+    if (wrap) wrap.classList.add("leave-" + dir);
+    await sleep(170);
+    if (state.screen !== "quiz") { state.busy = false; return; }
+    setQuestion(q);
+    renderQuestion(dir);
+    window.scrollTo(0, 0);
+    state.busy = false;
+    prefetch(index + (dir === "back" ? -1 : 1));
+  }
+
+  function goNext() {
+    const s = state.session, q = state.question;
+    if (state.busy) return;
+    if (s.done) return showResult();
+    if (q.index + 1 < s.total) return goTo(q.index + 1, "fwd");
+    // oxirgi savol, lekin javob berilmaganlari qolgan
+    toast(`Javob berilmagan savollar: ${s.total - s.position} ta`);
+    if (s.current !== null && s.current !== q.index) goTo(s.current, "back");
+  }
+
   async function choose(btn) {
     if (state.busy || btn.disabled) return;
     const q = state.question;
     const pos = +btn.dataset.pos;
-    const all = [...document.querySelectorAll(".opt")];
-    const hint = document.getElementById("hint");
     state.busy = true;
     btn.classList.add("pending");
 
@@ -410,68 +489,71 @@
       return fail(e);
     }
     btn.classList.remove("pending");
+    state.session = r.session;
+    if (state.screen !== "quiz" || state.question.index !== q.index) { state.busy = false; return; }
+    if (r.question) setQuestion(r.question);
 
-    if (r.stale) { // holat serverdagidan orqada qolgan — tenglashtiramiz
-      state.session = r.session;
-      state.question = r.question;
+    if (r.stale || !r.question) { // holat serverdagidan orqada qolgan — tenglashtiramiz
+      if (r.question) renderQuestion("");
       state.busy = false;
-      return r.session.done || !r.question ? showResult() : renderQuiz();
+      return;
     }
 
+    const all = [...document.querySelectorAll(".opt")];
+    const hint = document.getElementById("hint");
+
+    if (!r.resolved) { // mashq rejimi, xato: to'g'risini ko'rsatmaymiz, savol ochiq qoladi
+      setMark(btn, "wrong");
+      shake(btn);
+      haptic("error");
+      btn.disabled = true;
+      hint.textContent = "Xato. Yana urinib ko‘ring";
+      hint.className = "hint show";
+      state.busy = false;
+      return;
+    }
+
+    all.forEach((b) => { b.disabled = true; });
     if (r.correct) {
-      all.forEach((b) => { b.disabled = true; if (b !== btn && !b.classList.contains("wrong")) b.classList.add("dim"); });
       setMark(btn, "correct");
       hint.textContent = "To‘g‘ri!";
       hint.className = "hint ok show";
       haptic("success");
-      await sleep(800);
-      return next(r);
-    }
-
-    setMark(btn, "wrong");
-    shake(btn);
-    haptic("error");
-
-    if (r.advanced) { // imtihon rejimi: xato — to'g'risi ko'rsatiladi va keyingisiga o'tiladi
-      all.forEach((b) => { b.disabled = true; });
-      const right = all[r.correct_position];
+    } else { // imtihon rejimi, xato: to'g'ri javob ham ko'rsatiladi
+      setMark(btn, "wrong");
+      shake(btn);
+      haptic("error");
+      const right = all[r.question.correct_position];
       if (right) setMark(right, "reveal");
-      all.forEach((b) => { if (b !== btn && b !== right) b.classList.add("dim"); });
-      await sleep(1700);
-      return next(r);
     }
+    all.forEach((b) => {
+      if (!["wrong", "correct", "reveal"].some((c) => b.classList.contains(c))) b.classList.add("dim");
+    });
+    updateBar();
+    prefetch(q.index + 1);
 
-    // mashq rejimi: to'g'risini ko'rsatmaymiz, shu savolda qolamiz
-    btn.disabled = true;
-    q.tried.push(pos);
-    hint.textContent = "Xato. Yana urinib ko‘ring";
-    hint.className = "hint show";
-    state.busy = false;
-  }
-
-  async function next(r) {
-    state.session = r.session;
-    const bar = document.getElementById("bar");
-    if (bar) bar.style.width = (100 * r.session.position) / r.session.total + "%";
-    if (r.session.done || !r.question) {
-      await sleep(250);
+    if (r.question.explanation) { // izoh bor — foydalanuvchi o'qib, "Keyingi"ni o'zi bosadi
+      const box = document.getElementById("expl");
+      box.innerHTML = explHtml(r.question);
       state.busy = false;
-      return showResult();
+      await sleep(350);
+      const el = box.firstElementChild;
+      if (el && el.isConnected) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      return;
     }
-    const wrap = document.getElementById("qwrap");
-    wrap.classList.add("leave");
-    await sleep(190);
-    state.question = r.question;
-    document.getElementById("pos").textContent = r.session.position + 1;
-    renderQuestion(true);
-    window.scrollTo(0, 0);
+
+    // izoh yo'q — avvalgidek o'zi keyingi savolga o'tadi
+    await sleep(r.correct ? 800 : 1700);
     state.busy = false;
+    if (state.screen !== "quiz" || state.question.index !== q.index) return;
+    if (r.session.done) return showResult();
+    if (q.index + 1 < r.session.total) goTo(q.index + 1, "fwd");
   }
 
   async function exitQuiz() {
     if (state.busy) return;
     const s = state.session;
-    if (s && s.position > 0 && !(await confirmBox("Testdan chiqasizmi? Keyin davom ettirishingiz mumkin."))) return;
+    if (s && s.position > 0 && !s.done && !(await confirmBox("Testdan chiqasizmi? Keyin davom ettirishingiz mumkin."))) return;
     showHome();
   }
 
@@ -494,7 +576,8 @@
         <h3>Xato qilingan savollar</h3>
         ${r.mistakes.map((m) => `
           <div class="mistake"><p>${esc(m.text)}</p>
-            <div class="ans">${ICON.checkSm}<span>${esc(m.correct)}</span></div></div>`).join("")}
+            <div class="ans">${ICON.checkSm}<span>${esc(m.correct)}</span></div>
+            ${m.explanation ? `<p class="why">${esc(m.explanation)}</p>` : ""}</div>`).join("")}
       </section>` : "";
 
     app.innerHTML = `
@@ -560,6 +643,13 @@
     else if (act === "home") showHome();
     else if (act === "again") again();
     else if (act === "period") showRank(el.dataset.period);
+  });
+
+  qnav.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-nav]");
+    if (!b || b.disabled || state.screen !== "quiz") return;
+    if (b.dataset.nav === "prev") goTo(state.question.index - 1, "back");
+    else goNext();
   });
 
   tabbar.addEventListener("click", (e) => {

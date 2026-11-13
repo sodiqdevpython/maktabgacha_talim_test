@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.db.models import Count, Q
 from django.utils.html import format_html
 
-from .models import Module, Question, QuizSession, SessionQuestion, TelegramUser, Topic
+from .models import Module, Question, QuestionExplanation, QuizSession, SessionQuestion, TelegramUser, Topic
 
 
 class ReadOnlyInline(admin.TabularInline):
@@ -155,14 +155,43 @@ class TopicAdmin(admin.ModelAdmin):
         return obj._q
 
 
+class ExplanationInline(admin.StackedInline):
+    model = QuestionExplanation
+    extra = 0
+    max_num = 1
+    fields = ("text",)
+    verbose_name_plural = "Izoh (to‘g‘ri javob nega to‘g‘ri)"
+
+
+class HasExplanationFilter(admin.SimpleListFilter):
+    title = "izoh"
+    parameter_name = "izoh"
+
+    def lookups(self, request, model_admin):
+        return [("1", "Izohi bor"), ("0", "Izohi yo‘q")]
+
+    def queryset(self, request, queryset):
+        if self.value() in ("0", "1"):
+            return queryset.filter(explanation__isnull=self.value() == "0")
+        return queryset
+
+
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ("short_text", "topic", "is_active")
-    list_filter = ("is_active", "topic__module", "topic")
+    list_display = ("short_text", "topic", "has_explanation", "is_active")
+    list_filter = ("is_active", HasExplanationFilter, "topic__module", "topic")
+    inlines = [ExplanationInline]
     search_fields = ("text", "correct", "wrong1", "wrong2", "wrong3")
     list_select_related = ("topic",)
     list_per_page = 50
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("explanation")
+
     @admin.display(description="Savol")
     def short_text(self, obj):
         return obj.text[:110]
+
+    @admin.display(description="Izoh", boolean=True)
+    def has_explanation(self, obj):
+        return hasattr(obj, "explanation")

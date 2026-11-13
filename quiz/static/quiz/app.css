@@ -362,3 +362,36 @@ body.has-tabs #app { padding-bottom: calc(104px + env(safe-area-inset-bottom)); 
 .best.low { background: var(--bad-bg); color: var(--bad); }
 :root[data-theme="dark"] .best.mid { background: #3a2f17; }
 .screen > .stats { margin: 0 0 4px; }
+
+/* ------------------------------------------------ Oldingi / Keyingi */
+body.has-qnav #app { padding-bottom: calc(108px + env(safe-area-inset-bottom)); }
+.qnav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  display: flex; justify-content: center; gap: 10px;
+  padding: 10px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--bg); border-top: 1px solid var(--line);
+}
+.qnav .btn { max-width: 300px; min-height: 58px; padding: 12px 10px; border: 2px solid var(--primary); }
+.qnav .btn.ghost { border-color: var(--line); }
+.qnav .btn[disabled] { opacity: .38; }
+.qnav .btn svg { flex: none; }
+.qwrap.leave-fwd { opacity: 0; transform: translateX(-28px); }
+.qwrap.leave-back { opacity: 0; transform: translateX(28px); }
+.qwrap.enter-fwd { animation: q-in .3s cubic-bezier(.2, .8, .2, 1) both; }
+.qwrap.enter-back { animation: q-in-back .3s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes q-in-back { from { opacity: 0; transform: translateX(-28px); } }
+.opt.still { animation: none; }
+
+/* ------------------------------------------------ izoh */
+.expl {
+  margin-top: 4px; padding: 16px 18px; border-radius: var(--radius);
+  background: var(--card); border-left: 5px solid var(--gold); box-shadow: var(--shadow);
+  animation: fade-up .32s ease both; scroll-margin-bottom: 130px;
+}
+.expl b {
+  display: block; margin-bottom: 4px; color: var(--gold);
+  font-size: .8rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase;
+}
+.expl p { line-height: 1.5; }
+.mistake .why { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-weight: 500; font-size: .93rem; line-height: 1.45; }
+.hint:empty { min-height: 0; margin: 0 0 10px; }

@@ -1,6 +1,6 @@
 """Excel fayllardagi savollarni bazaga yuklaydi.
 
-    python manage.py import_questions                 (standart: ../test_savollar)
+    python manage.py import_questions                 (standart: loyihadagi savollar/ papkasi)
     python manage.py import_questions D:/savollar --replace
 
 Har bir .xlsx — bitta mavzu. Fayl nomi "1.1 ..." kabi kod bilan boshlanadi.
@@ -22,7 +22,7 @@ class Command(BaseCommand):
     help = "Excel fayllardagi test savollarini bazaga yuklaydi (har bir fayl — bitta mavzu)."
 
     def add_arguments(self, parser):
-        parser.add_argument("folder", nargs="?", default=str(settings.BASE_DIR.parent / "test_savollar"))
+        parser.add_argument("folder", nargs="?", default=str(settings.BASE_DIR / "savollar"))
         parser.add_argument("--replace", action="store_true",
                             help="Mavzuning eski savollarini o'chirib, qaytadan yuklaydi")
 

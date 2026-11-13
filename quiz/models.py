@@ -17,8 +17,12 @@ class TelegramUser(models.Model):
         ordering = ["-last_seen"]
 
     def __str__(self):
+        return self.display_name or str(self.tg_id)
+
+    @property
+    def display_name(self):
         name = f"{self.first_name} {self.last_name}".strip()
-        return name or (f"@{self.username}" if self.username else str(self.tg_id))
+        return name or (f"@{self.username}" if self.username else "")
 
     # DRF IsAuthenticated uchun
     @property
@@ -127,6 +131,7 @@ class SessionQuestion(models.Model):
     tried = models.CharField("Xato bosilgan o‘rinlar", max_length=4, blank=True)
     answered = models.BooleanField("Javob berilgan", default=False)
     first_try_correct = models.BooleanField("Birinchi urinishda to‘g‘ri", null=True)
+    answered_at = models.DateTimeField("Javob vaqti", null=True, blank=True, db_index=True)
 
     class Meta:
         verbose_name = "Urinishdagi savol"

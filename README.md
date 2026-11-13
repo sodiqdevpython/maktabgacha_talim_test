@@ -8,7 +8,7 @@ Backend — Django + Django REST Framework, baza — SQLite.
 ```bash
 pip install -r requirements.txt
 python manage.py migrate
-python manage.py import_questions        # ../test_savollar papkasidagi Excel fayllardan savollarni yuklaydi
+python manage.py import_questions        # savollar/ papkasidagi Excel fayllardan savollarni yuklaydi
 python manage.py createsuperuser         # admin panel uchun login/parol
 ```
 
@@ -36,6 +36,8 @@ python manage.py runbot                   # Telegram bot
 - **Aralash test** — nechta savol kerakligi kiritiladi, savollar barcha mavzulardan teng taqsimlab olinadi.
 - Variantlar har safar aralashtiriladi. To‘g‘ri javob brauzerga yuborilmaydi — tekshiruv serverda.
 - Tugallanmagan testni bosh sahifadagi «Davom ettirish» orqali davom ettirish mumkin.
+- **Reyting** (pastki menyu) — bugun / shu hafta / shu oyda eng ko‘p savol ishlagan foydalanuvchilar.
+- **Natijalarim** (pastki menyu) — foydalanuvchining o‘z ko‘rsatkichlari va oxirgi testlari.
 
 ## Admin panel
 

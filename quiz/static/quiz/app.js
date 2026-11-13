@@ -6,6 +6,10 @@
   const app = document.getElementById("app");
   const sheetRoot = document.getElementById("sheet-root");
   const toastEl = document.getElementById("toast");
+  const tabbar = document.getElementById("tabbar");
+  const TABS = ["home", "rank", "me"];
+  const PERIODS = [["day", "Bugun"], ["week", "Hafta"], ["month", "Oy"]];
+  const MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
   const LETTERS = ["A", "B", "C", "D"];
   const FONT_STEPS = [1, 1.15, 1.3];
 
@@ -19,7 +23,8 @@
     checkSm: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   };
 
-  const state = { home: null, session: null, question: null, last: null, busy: false, screen: "", sheet: null };
+  const state = { home: null, session: null, question: null, last: null, busy: false, screen: "", sheet: null,
+    rank: null, me: null, period: "week" };
 
   // ------------------------------------------------------------ yordamchilar
   const store = {
@@ -87,6 +92,12 @@
 
   function setScreen(name) {
     state.screen = name;
+    const tabs = TABS.includes(name);
+    tabbar.hidden = !tabs;
+    document.body.classList.toggle("has-tabs", tabs);
+    tabbar.querySelectorAll("button").forEach((b) => {
+      if (b.dataset.tab === name) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    });
     if (!tg) return;
     try {
       if (name === "quiz" || name === "result") tg.BackButton.show(); else tg.BackButton.hide();
@@ -141,6 +152,98 @@
           ${ICON.chev}
         </button>
         ${modules}
+      </div>`;
+  }
+
+  // ------------------------------------------------------------ reyting
+  const level = (p) => (p >= 85 ? "" : p >= 60 ? " mid" : " low");
+
+  async function showRank(period) {
+    if (period && period !== state.period) {
+      state.period = period;
+      store.set("period", period);
+      state.rank = null;
+    }
+    setScreen("rank");
+    renderRank();
+    window.scrollTo(0, 0);
+    let r;
+    try { r = await api("leaderboard/?period=" + state.period); } catch (e) { return fail(e); }
+    if (state.screen !== "rank" || r.period !== state.period) return;
+    state.rank = r;
+    renderRank();
+  }
+
+  function rankRow(e) {
+    return `
+      <div class="rrow${e.me ? " me" : ""}">
+        <span class="rk${e.rank <= 3 ? " r" + e.rank : ""}">${e.rank}</span>
+        <span class="t">${esc(e.name)}${e.me ? " <em>(siz)</em>" : ""}<small>${e.percent}% to‘g‘ri</small></span>
+        <span class="num"><b>${e.answered}</b><small>savol</small></span>
+      </div>`;
+  }
+
+  function renderRank() {
+    const r = state.rank;
+    const seg = PERIODS.map(([k, label]) =>
+      `<button data-act="period" data-period="${k}" aria-pressed="${k === state.period}">${label}</button>`).join("");
+    let body;
+    if (!r) body = '<div class="loading small"><span class="spinner"></span></div>';
+    else if (!r.top.length) body = '<p class="empty">Bu davrda hali hech kim test ishlamadi.<br>Birinchi bo‘ling!</p>';
+    else {
+      const outside = r.me && r.me.rank > r.top.length;
+      body = `<div class="list">${r.top.map(rankRow).join("")}${outside ? '<div class="gap">···</div>' + rankRow(r.me) : ""}</div>`
+        + (r.me ? "" : '<p class="empty">Siz bu davrda hali test ishlamadingiz.</p>');
+    }
+    app.innerHTML = `
+      <div class="screen">
+        <header class="top"><div><h1>Reyting</h1><p>Eng ko‘p savol ishlaganlar</p></div></header>
+        <div class="seg">${seg}</div>
+        ${body}
+      </div>`;
+  }
+
+  // ------------------------------------------------------------ mening natijalarim
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    const two = (n) => String(n).padStart(2, "0");
+    return `${d.getDate()}-${MONTHS[d.getMonth()]}, ${two(d.getHours())}:${two(d.getMinutes())}`;
+  }
+
+  async function showMe() {
+    setScreen("me");
+    if (state.me) renderMe(); else loading();
+    window.scrollTo(0, 0);
+    let r;
+    try { r = await api("me/"); } catch (e) { return fail(e); }
+    if (state.screen !== "me") return;
+    state.me = r;
+    renderMe();
+  }
+
+  function renderMe() {
+    const m = state.me;
+    const recent = m.recent.length ? `
+      <section class="module">
+        <h2>Oxirgi testlar</h2>
+        <div class="list">${m.recent.map((s) => `
+          <div class="row static">
+            <span class="t">${esc(s.title)}
+              <small>${fmtDate(s.date)} · ${s.mode === "exam" ? "Imtihon" : "Mashq"} · ${s.correct} / ${s.answered}${s.active ? " · tugallanmagan" : ""}</small></span>
+            <span class="best${level(s.percent)}">${s.percent}%</span>
+          </div>`).join("")}
+        </div>
+      </section>` : '<p class="empty">Hali test ishlamadingiz.<br>«Testlar» bo‘limidan boshlang.</p>';
+    app.innerHTML = `
+      <div class="screen">
+        <header class="top"><div><h1>Natijalarim</h1><p>${esc(m.name || "")}</p></div></header>
+        <div class="stats">
+          <div class="stat"><b>${m.today.answered}</b><span>Bugun</span></div>
+          <div class="stat"><b>${m.week.answered}</b><span>Shu hafta</span></div>
+          <div class="stat"><b>${m.all.answered}</b><span>Jami savol</span></div>
+          <div class="stat ok"><b>${m.all.percent}%</b><span>To‘g‘ri javob</span></div>
+        </div>
+        ${recent}
       </div>`;
   }
 
@@ -379,7 +482,8 @@
     let r;
     try { r = await api(`sessions/${state.session.id}/result/`); } catch (e) { fail(e); return showHome(); }
     if (state.screen !== "result") return;
-    state.home = null; // bosh sahifadagi natijalar yangilansin
+    state.home = null; // bosh sahifa va reyting yangilansin
+    state.rank = null;
 
     const p = r.percent;
     const level = p >= 85 ? "" : p >= 60 ? "mid" : "low";
@@ -455,6 +559,15 @@
     } else if (act === "exit") exitQuiz();
     else if (act === "home") showHome();
     else if (act === "again") again();
+    else if (act === "period") showRank(el.dataset.period);
+  });
+
+  tabbar.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-tab]");
+    if (!b || state.busy) return;
+    if (b.dataset.tab === "rank") showRank();
+    else if (b.dataset.tab === "me") showMe();
+    else showHome();
   });
 
   sheetRoot.addEventListener("click", (e) => {
@@ -498,6 +611,7 @@
   // ------------------------------------------------------------ ishga tushirish
   applyFont(clamp(parseInt(store.get("font", "0"), 10) || 0, 0, FONT_STEPS.length - 1));
   applyTheme();
+  state.period = PERIODS.some(([k]) => k === store.get("period", "week")) ? store.get("period", "week") : "week";
   if (tg) {
     try {
       tg.ready();

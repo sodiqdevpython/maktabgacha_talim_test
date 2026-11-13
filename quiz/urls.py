@@ -9,4 +9,6 @@ urlpatterns = [
     path("api/sessions/<int:pk>/", views.session_detail),
     path("api/sessions/<int:pk>/answer/", views.answer),
     path("api/sessions/<int:pk>/result/", views.result),
+    path("api/leaderboard/", views.leaderboard),
+    path("api/me/", views.my_stats),
 ]

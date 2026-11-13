@@ -41,10 +41,17 @@ class Command(BaseCommand):
             raise CommandError(".env faylida WEBAPP_URL yo'q yoki https:// bilan boshlanmaydi "
                                "(Telegram Web App faqat HTTPS manzilda ochiladi)")
 
-        me = self.api("getMe")
-        self.api("setMyCommands", commands=[{"command": "start", "description": "Testlarni ochish"}])
-        self.api("setChatMenuButton", menu_button={"type": "web_app", "text": "Testlar", "web_app": {"url": url}})
-        self.api("deleteWebhook")
+        while True:  # tarmoq vaqtincha uzilsa bot yiqilmasin — qayta urinamiz
+            try:
+                me = self.api("getMe")
+                self.api("setMyCommands", commands=[{"command": "start", "description": "Testlarni ochish"}])
+                self.api("setChatMenuButton",
+                         menu_button={"type": "web_app", "text": "Testlar", "web_app": {"url": url}})
+                self.api("deleteWebhook")
+                break
+            except requests.RequestException as e:
+                self.stderr.write(f"! Telegram bilan aloqa yo'q, 5 soniyadan keyin qayta urinaman: {e}")
+                time.sleep(5)
         self.stdout.write(self.style.SUCCESS(f"@{me['username']} ishlayapti. Web App: {url}  (to'xtatish: Ctrl+C)"))
 
         offset = None

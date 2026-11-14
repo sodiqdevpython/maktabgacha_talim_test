@@ -43,6 +43,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.middleware.gzip.GZipMiddleware",  # sahifa va API javoblarini siqib yuboradi (mobil tarmoqda tezroq)
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -87,7 +88,16 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-WHITENOISE_USE_FINDERS = True
+# Lokalda (DEBUG=1) fayllar to'g'ridan-to'g'ri ilova papkasidan olinadi; serverda — collectstatic
+# qilingan, oldindan siqilgan (.gz) nusxalardan. Statik manzillar ?v=... bilan versiyalangani uchun
+# brauzer ularni uzoq saqlashi mumkin.
+WHITENOISE_USE_FINDERS = DEBUG
+WHITENOISE_MAX_AGE = 0 if DEBUG else 7 * 24 * 3600
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage" if DEBUG
+                    else "whitenoise.storage.CompressedStaticFilesStorage"},
+}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {

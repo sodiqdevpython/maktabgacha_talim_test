@@ -24,6 +24,18 @@
   </nav>
   <div id="sheet-root"></div>
   <div id="toast" class="toast" role="status"></div>
+  <script>
+    // Zaxira: asosiy skript yuklanmasa yoki ishga tushmasa, cheksiz "yuklanmoqda" o'rniga xabar chiqadi
+    function appFailed() {
+      var app = document.getElementById("app");
+      if (window.__appStarted || !app || !app.querySelector(".loading")) return;
+      app.innerHTML = '<div class="screen notice"><h2>Ilova yuklanmadi</h2>' +
+        '<p>Sahifani qayta yuklab ko‘ring.</p>' +
+        '<button class="btn" onclick="location.reload()">Qayta yuklash</button></div>';
+    }
+    window.addEventListener("error", appFailed, true);
+    setTimeout(appFailed, 15000);
+  </script>
   <script src="{% static 'quiz/app.js' %}?v={{ v }}"></script>
 </body>
 </html>

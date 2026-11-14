@@ -67,11 +67,23 @@
     return res.json();
   }
 
-  function fail(e) {
+  // retry berilsa va ekranda hali faqat "yuklanmoqda" turgan bo'lsa — xabar va "Qayta urinish" tugmasi
+  // ko'rsatiladi (aks holda foydalanuvchi cheksiz aylanayotgan belgiga qarab qolardi).
+  function fail(e, retry) {
     if (e.message === "auth") return notice(
       inTelegram ? "Sessiya eskirdi" : "Telegram orqali oching",
       inTelegram ? "Ilovani yopib, qaytadan oching." : "Bu sahifa faqat Telegram bot ichida ishlaydi.");
-    toast(e.message === "net" ? "Internet aloqasi yo‘q. Qayta urinib ko‘ring." : "Xatolik yuz berdi. Qayta urinib ko‘ring.");
+    const msg = e.message === "net" ? "Internet aloqasi yo‘q" : "Xatolik yuz berdi";
+    if (retry && app.querySelector(".loading")) {
+      state.retry = retry;
+      app.innerHTML = `
+        <div class="screen notice">
+          <h2>${msg}</h2><p>Birozdan keyin qayta urinib ko‘ring.</p>
+          <button class="btn" data-act="retry">Qayta urinish</button>
+        </div>`;
+      return;
+    }
+    toast(msg + ". Qayta urinib ko‘ring.");
   }
 
   function notice(title, text) {
@@ -117,7 +129,7 @@
   async function showHome() {
     setScreen("home");
     if (!state.home) loading();
-    try { state.home = await api("home/"); } catch (e) { return fail(e); }
+    try { state.home = await api("home/"); } catch (e) { return fail(e, showHome); }
     if (state.screen !== "home") return;
     renderHome();
   }
@@ -179,7 +191,7 @@
     renderRank();
     window.scrollTo(0, 0);
     let r;
-    try { r = await api("leaderboard/?period=" + state.period); } catch (e) { return fail(e); }
+    try { r = await api("leaderboard/?period=" + state.period); } catch (e) { return fail(e, () => showRank()); }
     if (state.screen !== "rank" || r.period !== state.period) return;
     state.rank = r;
     renderRank();
@@ -226,7 +238,7 @@
     if (state.me) renderMe(); else loading();
     window.scrollTo(0, 0);
     let r;
-    try { r = await api("me/"); } catch (e) { return fail(e); }
+    try { r = await api("me/"); } catch (e) { return fail(e, showMe); }
     if (state.screen !== "me") return;
     state.me = r;
     renderMe();
@@ -416,6 +428,10 @@
     return q.explanation ? `<div class="expl"><b>Izoh</b><p>${esc(q.explanation)}</p></div>` : "";
   }
 
+  // Ko'p qatorli (moslashtirish) yoki juda uzun savol matni maydaroq harfda ko'rsatiladi
+  const NEWLINE = String.fromCharCode(10);
+  const isLong = (text) => text.indexOf(NEWLINE) >= 0 || text.length > 320;
+
   // dir: "" (animatsiyasiz) | "fwd" | "back"
   function renderQuestion(dir) {
     const q = state.question;
@@ -424,8 +440,7 @@
     wrap.className = "qwrap" + (dir ? " enter-" + dir : "");
     wrap.innerHTML = `
       ${q.topic ? `<p class="qtopic">${esc(q.topic)}</p>` : ""}
-      <div class="qtext${q.text.includes("
-") || q.text.length > 320 ? " long" : ""}">${esc(q.text)}</div>
+      <div class="qtext${isLong(q.text) ? " long" : ""}">${esc(q.text)}</div>
       <div class="opts">${q.options.map((o, i) => {
         let cls = "", mark = "";
         if (q.tried.includes(i)) { cls = " wrong"; mark = ICON.cross; }
@@ -679,6 +694,7 @@
     else if (act === "home") showHome();
     else if (act === "again") again();
     else if (act === "period") showRank(el.dataset.period);
+    else if (act === "retry" && state.retry) state.retry();
   });
 
   qnav.addEventListener("click", (e) => {
@@ -749,5 +765,6 @@
       tg.BackButton.onClick(onBack);
     } catch (e) { /* Telegram'dan tashqarida */ }
   }
+  window.__appStarted = true; // index.html dagi "ilova yuklanmadi" zaxira xabari endi kerak emas
   showHome();
 })();

@@ -13,6 +13,7 @@ from rest_framework.response import Response
 
 from .models import Question, QuestionExplanation, QuizSession, SessionQuestion, TelegramUser, Topic
 from .serializers import AnswerSerializer, StartSessionSerializer
+from .topic_titles import EXAM_MODULE
 
 STATIC_DIR = Path(__file__).resolve().parent / "static" / "quiz"
 
@@ -36,6 +37,13 @@ def session_payload(s):
             "title": s.title, "topic": None if s.is_mixed else s.topic_id, "mixed": s.is_mixed,
             "done": s.is_complete, "closed": s.finished_at is not None,
             "current": None if s.is_complete else first_unanswered(s)}
+
+
+def topic_label(topic):
+    """Aralash testda savol qaysi mavzudan ekani ("Tushgan testlar" uchun kod ko'rsatilmaydi)."""
+    if topic.code.startswith(f"{EXAM_MODULE}."):
+        return topic.title
+    return f"{topic.code}. {topic.title}"
 
 
 def explanation_of(q):
@@ -65,7 +73,7 @@ def question_payload(s, index=None):
         "text": q.text,
         "options": [opts[int(c)] for c in item.order],
         "tried": [int(c) for c in item.tried],
-        "topic": f"{q.topic.code}. {q.topic.title}" if s.is_mixed else "",
+        "topic": topic_label(q.topic) if s.is_mixed else "",
         "answered": item.answered,
     }
     if item.answered:
@@ -95,8 +103,8 @@ def pick_mixed(n):
     return chosen
 
 
-def random_order():
-    order = list("0123")
+def random_order(n=4):
+    order = list("0123"[:n])
     random.shuffle(order)
     return "".join(order)
 
@@ -117,19 +125,26 @@ def home(request):
     for tid, correct, total in done:
         best[tid] = max(best.get(tid, 0), round(100 * correct / total))
 
-    modules, total = [], 0
+    modules, exam, total = [], None, 0
     for t in topics:
+        item = {"id": t.id, "code": t.code, "title": t.title, "count": t.n, "best": best.get(t.id)}
+        total += t.n
+        if t.module.number == EXAM_MODULE:  # "Tushgan testlar" — alohida, tepada
+            if exam is None:
+                exam = {"title": t.module.title, "count": 0, "topics": []}
+            exam["topics"].append({**item, "exam": True})
+            exam["count"] += t.n
+            continue
         if not modules or modules[-1]["number"] != t.module.number:
             modules.append({"number": t.module.number, "title": t.module.title, "topics": []})
-        modules[-1]["topics"].append({"id": t.id, "code": t.code, "title": t.title, "count": t.n,
-                                      "best": best.get(t.id)})
-        total += t.n
+        modules[-1]["topics"].append(item)
 
     active = (QuizSession.objects.filter(user=user, finished_at__isnull=True, position__gt=0)
               .select_related("topic").order_by("-started_at").first())
     return Response({
         "user": {"name": user.first_name or str(user)},
         "modules": modules,
+        "exam": exam,
         "total": total,
         "resume": session_payload(active) if active else None,
     })
@@ -160,8 +175,9 @@ def start_session(request):
         old.update(finished_at=timezone.now())
         s = QuizSession.objects.create(user=request.user, topic=topic, is_mixed=topic is None,
                                        mode=mode, total=len(ids))
+        three = set(Question.objects.filter(id__in=ids, wrong3="").values_list("id", flat=True))
         SessionQuestion.objects.bulk_create(
-            SessionQuestion(session=s, question_id=qid, index=i, order=random_order())
+            SessionQuestion(session=s, question_id=qid, index=i, order=random_order(3 if qid in three else 4))
             for i, qid in enumerate(ids))
     return Response({"session": session_payload(s), "question": question_payload(s)}, status=201)
 
@@ -199,6 +215,8 @@ def answer(request, pk):
             return Response({"stale": True, "session": session_payload(s),
                              "question": question_payload(s, index)})
 
+        if position >= len(item.order):
+            return Response({"detail": "Bunday variant yo‘q."}, status=400)
         is_correct = item.order[position] == "0"
         resolved = False
 

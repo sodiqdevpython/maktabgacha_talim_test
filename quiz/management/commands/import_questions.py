@@ -19,6 +19,14 @@ from quiz.models import Module, Question, QuestionExplanation, Topic
 from quiz.topic_titles import MODULES, TOPICS
 
 
+def clean(value):
+    """Ortiqcha bo'shliqlarni olib tashlaydi, lekin qator uzilishlarini (moslashtirish savollari) saqlaydi."""
+    if value is None:
+        return ""
+    lines = (" ".join(line.split()) for line in str(value).splitlines())
+    return "\n".join(line for line in lines if line)
+
+
 class Command(BaseCommand):
     help = "Excel fayllardagi test savollarini bazaga yuklaydi (har bir fayl — bitta mavzu)."
 
@@ -47,8 +55,8 @@ class Command(BaseCommand):
             rows = []
             ws = load_workbook(f, read_only=True).active
             for r in ws.iter_rows(min_row=2, values_only=True):
-                cells = [" ".join(str(c).split()) if c is not None else "" for c in (list(r) + [None] * 6)[:6]]
-                if all(cells[:5]):
+                cells = [clean(c) for c in (list(r) + [None] * 6)[:6]]
+                if all(cells[:4]):  # savol, to'g'ri javob va kamida 2 ta xato variant
                     rows.append(cells)
 
             with transaction.atomic():

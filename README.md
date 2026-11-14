@@ -33,6 +33,7 @@ python manage.py runbot                   # Telegram bot
 - **Bosh sahifa** — modullar va mavzular ro‘yxati, tepada «Aralash test».
 - **Mashq** rejimi — xato javob qizil bo‘ladi, to‘g‘risi ko‘rsatilmaydi; to‘g‘ri topilmaguncha keyingi savolga o‘tmaydi.
 - **Imtihon** rejimi — har savolga bitta urinish: to‘g‘ri bo‘lsa yashil, xato bo‘lsa qizil (to‘g‘risi ko‘rsatiladi) va keyingisiga o‘tadi.
+- **Tushgan testlar** — imtihonda tushgan savollar to‘plami, bosh sahifaning eng tepasida alohida tugma. Savollari `savollar/0.1.xlsx` faylida (`0.N.xlsx` — yangi to‘plam qo‘shish uchun).
 - **Aralash test** — nechta savol kerakligi kiritiladi, savollar barcha mavzulardan teng taqsimlab olinadi.
 - Variantlar har safar aralashtiriladi. To‘g‘ri javob brauzerga yuborilmaydi — tekshiruv serverda.
 - Tugallanmagan testni bosh sahifadagi «Davom ettirish» orqali davom ettirish mumkin.

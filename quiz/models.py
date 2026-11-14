@@ -65,7 +65,7 @@ class Question(models.Model):
     correct = models.TextField("To‘g‘ri javob")
     wrong1 = models.TextField("Xato javob 1")
     wrong2 = models.TextField("Xato javob 2")
-    wrong3 = models.TextField("Xato javob 3")
+    wrong3 = models.TextField("Xato javob 3", blank=True)  # bo'sh bo'lsa — savolda 3 ta variant
     is_active = models.BooleanField("Faol", default=True)
 
     class Meta:
@@ -79,7 +79,7 @@ class Question(models.Model):
     @property
     def options(self):
         """0-indeks doim to'g'ri javob; foydalanuvchiga aralashtirilgan tartibda yuboriladi."""
-        return [self.correct, self.wrong1, self.wrong2, self.wrong3]
+        return [o for o in (self.correct, self.wrong1, self.wrong2, self.wrong3) if o]
 
 
 class QuestionExplanation(models.Model):

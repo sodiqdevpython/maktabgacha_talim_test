@@ -17,6 +17,7 @@
   const ICON = {
     chev: '<svg class="chev" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
     mix: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>',
+    doc: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14l2 2 4-4"/></svg>',
     play: '<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5z"/></svg>',
     close: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     check: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
@@ -130,6 +131,12 @@
         <span class="tx"><b>Davom ettirish</b><small>${esc(h.resume.title)} · ${h.resume.position} / ${h.resume.total}</small></span>
         ${ICON.chev}
       </button>` : "";
+    const exam = h.exam ? `
+      <button class="hero exam" data-act="exam">
+        <span class="ico">${ICON.doc}</span>
+        <span class="tx"><b>${esc(h.exam.title)}</b><small>Imtihonda tushgan savollar · ${h.exam.count} ta</small></span>
+        ${ICON.chev}
+      </button>` : "";
     const modules = h.modules.map((m) => `
       <section class="module">
         <h2><small>${m.number}-modul</small>${esc(m.title)}</h2>
@@ -149,6 +156,7 @@
           <button class="fs-btn" data-act="font" aria-label="Harf o‘lchamini o‘zgartirish"><small>A</small>A</button>
         </header>
         ${resume}
+        ${exam}
         <button class="hero" data-act="mixed">
           <span class="ico">${ICON.mix}</span>
           <span class="tx"><b>Aralash test</b><small>Barcha mavzulardan</small></span>
@@ -270,7 +278,7 @@
         <div class="sheet" role="dialog" aria-modal="true">
           <div class="grab"></div>
           <h3>${esc(topic ? topic.title : "Aralash test")}</h3>
-          <p class="sub">${topic ? esc(topic.code) + "-mavzu · " + max + " ta savol" : "Barcha mavzulardan aralash savollar"}</p>
+          <p class="sub">${topic ? (topic.exam ? "Imtihonda tushgan savollar" : esc(topic.code) + "-mavzu") + " · " + max + " ta savol" : "Barcha mavzulardan aralash savollar"}</p>
 
           <p class="label">Savollar soni</p>
           <div class="stepper">
@@ -299,9 +307,35 @@
     try { if (tg) tg.BackButton.show(); } catch (e) { /* eski versiya */ }
   }
 
+  // "Tushgan testlar"da bir nechta to'plam bo'lsa — avval qaysi biri ekanini tanlash oynasi
+  function openChooser(group) {
+    state.sheet = { chooser: true };
+    sheetRoot.innerHTML = `
+      <div class="overlay">
+        <div class="sheet" role="dialog" aria-modal="true">
+          <div class="grab"></div>
+          <h3>${esc(group.title)}</h3>
+          <p class="sub">Qaysi to‘plamni ishlaysiz?</p>
+          <div class="list pick">${group.topics.map((t) => `
+            <button class="row" data-pick="${t.id}">
+              <span class="t">${esc(t.title)}<small>${t.count} ta savol</small></span>
+              ${t.best === null || t.best === undefined ? ICON.chev : `<span class="best">${t.best}%</span>`}
+            </button>`).join("")}
+          </div>
+        </div>
+      </div>`;
+    try { if (tg) tg.BackButton.show(); } catch (e) { /* eski versiya */ }
+  }
+
+  function findTopic(id) {
+    const h = state.home;
+    const all = h.modules.flatMap((m) => m.topics).concat(h.exam ? h.exam.topics : []);
+    return all.find((t) => t.id === id);
+  }
+
   function syncSheet() {
     const s = state.sheet;
-    if (!s) return;
+    if (!s || s.chooser) return;
     const input = sheetRoot.querySelector("#cnt");
     if (input && document.activeElement !== input) input.value = s.count;
     sheetRoot.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(+c.dataset.count === s.count)));
@@ -390,7 +424,8 @@
     wrap.className = "qwrap" + (dir ? " enter-" + dir : "");
     wrap.innerHTML = `
       ${q.topic ? `<p class="qtopic">${esc(q.topic)}</p>` : ""}
-      <div class="qtext">${esc(q.text)}</div>
+      <div class="qtext${q.text.includes("
+") || q.text.length > 320 ? " long" : ""}">${esc(q.text)}</div>
       <div class="opts">${q.options.map((o, i) => {
         let cls = "", mark = "";
         if (q.tried.includes(i)) { cls = " wrong"; mark = ICON.cross; }
@@ -629,10 +664,11 @@
     if (!el) return;
     const act = el.dataset.act;
     if (act === "topic") {
-      for (const m of state.home.modules) {
-        const t = m.topics.find((x) => x.id === +el.dataset.id);
-        if (t) return openSheet(t);
-      }
+      const t = findTopic(+el.dataset.id);
+      if (t) openSheet(t);
+    } else if (act === "exam") {
+      const group = state.home.exam;
+      if (group.topics.length === 1) openSheet(group.topics[0]); else openChooser(group);
     } else if (act === "mixed") openSheet(null);
     else if (act === "resume") resume(state.home.resume.id);
     else if (act === "font") {
@@ -664,6 +700,9 @@
     const s = state.sheet;
     if (!s) return;
     if (e.target.classList.contains("overlay")) return closeSheet();
+    const pick = e.target.closest("[data-pick]");
+    if (pick) { const t = findTopic(+pick.dataset.pick); if (t) openSheet(t); return; }
+    if (s.chooser) return;
     const step = e.target.closest("[data-step]");
     const chip = e.target.closest(".chip");
     const mode = e.target.closest(".mode");

@@ -4,7 +4,10 @@ Import paytida Excel fayl nomining boshidagi kod ("1.1", "10.4") shu ro'yxat bil
 Nomlarni keyinchalik admin paneldan ham o'zgartirish mumkin.
 """
 
+EXAM_MODULE = 0  # "Tushgan testlar" — bosh sahifada mavzulardan alohida, tepada ko'rsatiladi
+
 MODULES = {
+    0: "Tushgan testlar",
     1: "Ta’lim menejmenti",
     2: "Ta’lim tashkilotini rivojlantirish va o‘quv-tarbiya jarayonini boshqarish",
     3: "Pedagoglarning kasbiy rivojlanishi va metodik xizmat",
@@ -18,6 +21,7 @@ MODULES = {
 }
 
 TOPICS = {
+    "0.1": "2026-yil sentabrda tushgan testlar",
     "1.1": "Maktabgacha ta’limni boshqarish strategiyasi",
     "1.2": "Maktabgacha ta’limda boshqaruv psixologiyasi",
     "1.3": "Muammolarga yechim topish va qarorlarni qabul qilish",

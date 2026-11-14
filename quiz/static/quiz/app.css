@@ -395,3 +395,10 @@ body.has-qnav #app { padding-bottom: calc(108px + env(safe-area-inset-bottom)); 
 .expl p { line-height: 1.5; }
 .mistake .why { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-weight: 500; font-size: .93rem; line-height: 1.45; }
 .hint:empty { min-height: 0; margin: 0 0 10px; }
+
+/* ------------------------------------------------ tushgan testlar */
+.hero.exam { background: #8a5a12; color: #fff; }
+:root[data-theme="dark"] .hero.exam { background: #7a5216; }
+.list.pick { margin-top: 16px; }
+.qtext, .mistake p { white-space: pre-line; }
+.qtext.long { font-size: 1.02rem; font-weight: 500; line-height: 1.5; }

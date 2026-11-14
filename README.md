@@ -61,7 +61,8 @@ Mavzu nomlari `quiz/topic_titles.py` da; keyin admin paneldan ham o‘zgartirsa 
 ## Serverda (VPS)
 
 Loyiha `/home/maktabgacha_talim_test` papkasida, alohida `quizbot` foydalanuvchisi nomidan ishlaydi.
-Serverdagi boshqa loyihalarga tegmaslik uchun sayt o‘z portida ochiladi: `https://189-74-98-102.sslip.io:8443`.
+Serverdagi boshqa loyihalarga tegmaslik uchun sayt o‘z portida ochiladi: `https://testdor.uz:8443`
+(eski `https://189-74-98-102.sslip.io:8443` manzili ham ishlaydi — sertifikat ikkala nomni qamraydi).
 
 | Nima | Qayerda |
 |------|---------|

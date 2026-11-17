@@ -22,6 +22,7 @@ MODULES = {
 
 TOPICS = {
     "0.1": "2026-yil sentabrda tushgan testlar",
+    "0.2": "2026-yil oktabrda tushgan testlar",
     "1.1": "Maktabgacha ta’limni boshqarish strategiyasi",
     "1.2": "Maktabgacha ta’limda boshqaruv psixologiyasi",
     "1.3": "Muammolarga yechim topish va qarorlarni qabul qilish",

@@ -402,3 +402,4 @@ body.has-qnav #app { padding-bottom: calc(108px + env(safe-area-inset-bottom)); 
 .list.pick { margin-top: 16px; }
 .qtext, .mistake p { white-space: pre-line; }
 .qtext.long { font-size: 1.02rem; font-weight: 500; line-height: 1.5; }
+.hero .best { flex: none; padding: 5px 10px; border-radius: 999px; font-weight: 750; font-size: .85rem; background: rgba(255, 255, 255, .22); color: #fff; }

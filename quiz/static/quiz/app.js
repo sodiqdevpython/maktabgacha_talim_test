@@ -143,12 +143,20 @@
         <span class="tx"><b>Davom ettirish</b><small>${esc(h.resume.title)} · ${h.resume.position} / ${h.resume.total}</small></span>
         ${ICON.chev}
       </button>` : "";
-    const exam = h.exam ? `
+    // "Tushgan testlar": har bir to'plam (oktabr, sentabr, ...) bosh sahifada alohida tugma, yangisi tepada.
+    // To'plamlar juda ko'payib ketsa — bitta tugma va tanlash oynasi.
+    const sets = h.exam ? h.exam.topics.slice().reverse() : [];
+    const exam = !sets.length ? "" : sets.length > 4 ? `
       <button class="hero exam" data-act="exam">
         <span class="ico">${ICON.doc}</span>
         <span class="tx"><b>${esc(h.exam.title)}</b><small>Imtihonda tushgan savollar · ${h.exam.count} ta</small></span>
         ${ICON.chev}
-      </button>` : "";
+      </button>` : sets.map((t) => `
+      <button class="hero exam" data-act="topic" data-id="${t.id}">
+        <span class="ico">${ICON.doc}</span>
+        <span class="tx"><b>${esc(t.title)}</b><small>Imtihonda tushgan savollar · ${t.count} ta</small></span>
+        ${t.best === null || t.best === undefined ? ICON.chev : `<span class="best">${t.best}%</span>`}
+      </button>`).join("");
     const modules = h.modules.map((m) => `
       <section class="module">
         <h2><small>${m.number}-modul</small>${esc(m.title)}</h2>

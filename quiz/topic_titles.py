@@ -22,7 +22,8 @@ MODULES = {
 
 TOPICS = {
     "0.1": "Sentabr oyi testlari",
-    "0.2": "Oktabr oyi testlari",
+    "0.2": "Oktabr oyi testlari (1-qism)",
+    "0.3": "Oktabr oyi testlari (2-qism)",
     "1.1": "Maktabgacha ta’limni boshqarish strategiyasi",
     "1.2": "Maktabgacha ta’limda boshqaruv psixologiyasi",
     "1.3": "Muammolarga yechim topish va qarorlarni qabul qilish",

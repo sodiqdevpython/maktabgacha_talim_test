@@ -176,6 +176,12 @@
           <button class="fs-btn" data-act="font" aria-label="Harf o‘lchamini o‘zgartirish"><small>A</small>A</button>
         </header>
         ${resume}
+        ${(h.menus || []).map((g, i) => `
+        <button class="hero exam" data-act="menu" data-menu="${i}">
+          <span class="ico">${ICON.doc}</span>
+          <span class="tx"><b>${esc(g.title)}</b><small>${g.topics.length} ta qism · ${g.count} ta savol</small></span>
+          ${ICON.chev}
+        </button>`).join("")}
         ${exam}
         <button class="hero" data-act="mixed">
           <span class="ico">${ICON.mix}</span>
@@ -297,8 +303,8 @@
       <div class="overlay" data-act="sheet-close">
         <div class="sheet" role="dialog" aria-modal="true">
           <div class="grab"></div>
-          <h3>${esc(topic ? topic.title : "Aralash test")}</h3>
-          <p class="sub">${topic ? (topic.exam ? "Imtihonda tushgan savollar" : esc(topic.code) + "-mavzu") + " · " + max + " ta savol" : "Barcha mavzulardan aralash savollar"}</p>
+          <h3>${esc(topic ? (topic.group ? topic.group + " — " + topic.title : topic.title) : "Aralash test")}</h3>
+          <p class="sub">${topic ? (topic.exam || topic.group ? "Imtihonda tushgan savollar" : esc(topic.code) + "-mavzu") + " · " + max + " ta savol" : "Barcha mavzulardan aralash savollar"}</p>
 
           <p class="label">Savollar soni</p>
           <div class="stepper">
@@ -335,7 +341,7 @@
         <div class="sheet" role="dialog" aria-modal="true">
           <div class="grab"></div>
           <h3>${esc(group.title)}</h3>
-          <p class="sub">Qaysi to‘plamni ishlaysiz?</p>
+          <p class="sub">Qaysi qismni ishlaysiz?</p>
           <div class="list pick">${group.topics.map((t) => `
             <button class="row" data-pick="${t.id}">
               <span class="t">${esc(t.title)}<small>${t.count} ta savol</small></span>
@@ -349,7 +355,8 @@
 
   function findTopic(id) {
     const h = state.home;
-    const all = h.modules.flatMap((m) => m.topics).concat(h.exam ? h.exam.topics : []);
+    const all = h.modules.flatMap((m) => m.topics).concat(h.exam ? h.exam.topics : [])
+      .concat((h.menus || []).flatMap((g) => g.topics));
     return all.find((t) => t.id === id);
   }
 
@@ -689,6 +696,10 @@
     if (act === "topic") {
       const t = findTopic(+el.dataset.id);
       if (t) openSheet(t);
+    } else if (act === "menu") {
+      // "Nozima" kabi menyu: bosilganda ichidagi qismlar (1-qism, 2-qism, ...) ro'yxati ochiladi
+      const group = (state.home.menus || [])[+el.dataset.menu];
+      if (group) openChooser(group);
     } else if (act === "exam") {
       const group = state.home.exam;
       if (group.topics.length === 1) openSheet(group.topics[0]); else openChooser(group);

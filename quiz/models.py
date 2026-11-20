@@ -31,8 +31,15 @@ class TelegramUser(models.Model):
 
 
 class Module(models.Model):
+    LIST = "list"        # bosh sahifada sarlavha va uning ostida mavzular ro'yxati (ma'ruza modullari)
+    BUTTONS = "buttons"  # har bir mavzu bosh sahifada alohida katta tugma (tushgan testlar to'plamlari)
+    MENU = "menu"        # bitta katta tugma; bosilganda ichidagi qismlar ro'yxati ochiladi
+    DISPLAYS = [(LIST, "Ro‘yxat (ma’ruza moduli)"), (BUTTONS, "Har bir mavzu alohida tugma"),
+                (MENU, "Bitta tugma, ichida qismlar")]
+
     number = models.PositiveIntegerField("Raqam", unique=True)
     title = models.CharField("Nomi", max_length=255)
+    display = models.CharField("Bosh sahifada ko‘rinishi", max_length=8, choices=DISPLAYS, default=LIST)
 
     class Meta:
         verbose_name = "Modul"
@@ -126,6 +133,8 @@ class QuizSession(models.Model):
     def title(self):
         if self.is_mixed or self.topic_id is None:
             return "Aralash test"
+        if self.topic.module.display == Module.MENU:  # "Nozima — 2-qism"
+            return f"{self.topic.module.title} — {self.topic.title}"
         return self.topic.title
 
     @property

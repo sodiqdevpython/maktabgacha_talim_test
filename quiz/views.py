@@ -11,9 +11,8 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Question, QuestionExplanation, QuizSession, SessionQuestion, TelegramUser, Topic
+from .models import Module, Question, QuestionExplanation, QuizSession, SessionQuestion, TelegramUser, Topic
 from .serializers import AnswerSerializer, StartSessionSerializer
-from .topic_titles import EXAM_MODULE
 
 STATIC_DIR = Path(__file__).resolve().parent / "static" / "quiz"
 
@@ -40,8 +39,11 @@ def session_payload(s):
 
 
 def topic_label(topic):
-    """Aralash testda savol qaysi mavzudan ekani ("Tushgan testlar" uchun kod ko'rsatilmaydi)."""
-    if topic.code.startswith(f"{EXAM_MODULE}."):
+    """Aralash testda savol qaysi mavzudan ekani (kod faqat ma'ruza mavzularida ko'rsatiladi)."""
+    display = topic.module.display
+    if display == Module.MENU:
+        return f"{topic.module.title} — {topic.title}"
+    if display == Module.BUTTONS:
         return topic.title
     return f"{topic.code}. {topic.title}"
 
@@ -62,7 +64,7 @@ def question_payload(s, index=None):
         index = first_unanswered(s)
         if index is None:
             return None
-    item = (s.items.select_related("question__topic", "question__explanation")
+    item = (s.items.select_related("question__topic__module", "question__explanation")
             .filter(index=index).first())
     if item is None:
         return None
@@ -83,10 +85,19 @@ def question_payload(s, index=None):
 
 
 def pick_mixed(n):
-    """Barcha mavzulardan imkon qadar teng taqsimlab n ta savol tanlaydi."""
-    by_topic = defaultdict(list)
-    rows = Question.objects.filter(is_active=True, topic__is_active=True).values_list("id", "topic_id")
-    for qid, tid in rows:
+    """Barcha mavzulardan imkon qadar teng taqsimlab n ta savol tanlaydi.
+
+    Bir xil savol bir nechta to'plamda bo'lishi mumkin (masalan, "Nozima" qismlari boshqa to'plamlarni
+    takrorlaydi) — aralash testga har bir savol matni faqat bir marta tushadi.
+    """
+    by_topic, seen = defaultdict(list), set()
+    rows = (Question.objects.filter(is_active=True, topic__is_active=True)
+            .order_by("topic__module__number", "topic__order", "id").values_list("id", "topic_id", "text"))
+    for qid, tid, text in rows:
+        key = "".join(ch for ch in text.lower() if ch.isalnum())
+        if key in seen:
+            continue
+        seen.add(key)
         by_topic[tid].append(qid)
     for ids in by_topic.values():
         random.shuffle(ids)
@@ -125,26 +136,32 @@ def home(request):
     for tid, correct, total in done:
         best[tid] = max(best.get(tid, 0), round(100 * correct / total))
 
-    modules, exam, total = [], None, 0
+    modules, exam, menus, total = [], None, {}, 0
     for t in topics:
         item = {"id": t.id, "code": t.code, "title": t.title, "count": t.n, "best": best.get(t.id)}
         total += t.n
-        if t.module.number == EXAM_MODULE:  # "Tushgan testlar" — alohida, tepada
+        if t.module.display == Module.BUTTONS:  # "Tushgan testlar" — har bir to'plam alohida tugma
             if exam is None:
                 exam = {"title": t.module.title, "count": 0, "topics": []}
             exam["topics"].append({**item, "exam": True})
             exam["count"] += t.n
+            continue
+        if t.module.display == Module.MENU:  # bitta tugma ("Nozima"), ichida qismlar
+            group = menus.setdefault(t.module.number, {"title": t.module.title, "count": 0, "topics": []})
+            group["topics"].append({**item, "group": t.module.title})
+            group["count"] += t.n
             continue
         if not modules or modules[-1]["number"] != t.module.number:
             modules.append({"number": t.module.number, "title": t.module.title, "topics": []})
         modules[-1]["topics"].append(item)
 
     active = (QuizSession.objects.filter(user=user, finished_at__isnull=True, position__gt=0)
-              .select_related("topic").order_by("-started_at").first())
+              .select_related("topic__module").order_by("-started_at").first())
     return Response({
         "user": {"name": user.first_name or str(user)},
         "modules": modules,
         "exam": exam,
+        "menus": list(menus.values()),
         "total": total,
         "resume": session_payload(active) if active else None,
     })
@@ -184,14 +201,14 @@ def start_session(request):
 
 @api_view(["GET"])
 def session_detail(request, pk):
-    s = get_object_or_404(QuizSession.objects.select_related("topic"), pk=pk, user=request.user)
+    s = get_object_or_404(QuizSession.objects.select_related("topic__module"), pk=pk, user=request.user)
     return Response({"session": session_payload(s), "question": question_payload(s)})
 
 
 @api_view(["GET"])
 def question(request, pk, index):
     """Istalgan savolni ko'rish — oldingi/keyingi savolga o'tish uchun."""
-    s = get_object_or_404(QuizSession.objects.select_related("topic"), pk=pk, user=request.user)
+    s = get_object_or_404(QuizSession.objects.select_related("topic__module"), pk=pk, user=request.user)
     data = question_payload(s, index)
     if data is None:
         return Response({"detail": "Savol topilmadi."}, status=404)
@@ -205,7 +222,7 @@ def answer(request, pk):
     index, position = ser.validated_data["index"], ser.validated_data["position"]
 
     with transaction.atomic():
-        s = get_object_or_404(QuizSession.objects.select_for_update().select_related("topic"),
+        s = get_object_or_404(QuizSession.objects.select_for_update().select_related("topic__module"),
                               pk=pk, user=request.user)
         item = s.items.select_related("question").filter(index=index).first()
         if item is None:
@@ -254,7 +271,7 @@ def answer(request, pk):
 
 @api_view(["GET"])
 def result(request, pk):
-    s = get_object_or_404(QuizSession.objects.select_related("topic"), pk=pk, user=request.user)
+    s = get_object_or_404(QuizSession.objects.select_related("topic__module"), pk=pk, user=request.user)
     missed = (s.items.filter(answered=True, first_try_correct=False)
               .select_related("question__explanation"))
     return Response({
@@ -334,7 +351,7 @@ def my_stats(request):
         return a
 
     sessions = QuizSession.objects.filter(user=user, position__gt=0)
-    recent = sessions.select_related("topic").order_by("-started_at")[:20]
+    recent = sessions.select_related("topic__module").order_by("-started_at")[:20]
     return Response({
         "name": user.display_name,
         "today": summary(period_start("day")),

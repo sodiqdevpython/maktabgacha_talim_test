@@ -16,7 +16,7 @@ from django.db import transaction
 from openpyxl import load_workbook
 
 from quiz.models import Module, Question, QuestionExplanation, Topic
-from quiz.topic_titles import MODULES, TOPICS
+from quiz.topic_titles import MODULE_DISPLAY, MODULES, TOPICS
 
 
 def clean(value):
@@ -61,7 +61,8 @@ class Command(BaseCommand):
 
             with transaction.atomic():
                 module, _ = Module.objects.get_or_create(
-                    number=mod_no, defaults={"title": MODULES.get(mod_no, f"{mod_no}-modul")})
+                    number=mod_no, defaults={"title": MODULES.get(mod_no, f"{mod_no}-modul"),
+                                             "display": MODULE_DISPLAY.get(mod_no, Module.LIST)})
                 topic, _ = Topic.objects.get_or_create(
                     code=code, defaults={"module": module, "order": mod_no * 100 + sub_no,
                                          "title": TOPICS.get(code, f.stem)})
